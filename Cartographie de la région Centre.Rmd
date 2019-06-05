@@ -1,0 +1,227 @@
+---
+title: "Cartographie de la région Centre"
+author: "Alexandre, Franck et Becelhi"
+date: "03/06/2019"
+output: 
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Cartographie de la région Centre Val-de-Loire
+
+Le présent document est un relevé des différentes quantitées de polluants relevés dans la région Centre-Val-de-Loire,  afin de pouvoir faciliter la prise de décision concernant l'installation d'activités touristiques dans des zones moins polluées.
+
+Nous nous sommes orientés sur les relevés en Monoxyde d'azote, Dioxyde d'azote, Ozone et Particules fines, ces derniers présentant les relevés les plus importants toutes zones de prélèvement confondues.
+
+## Chargement des librairies
+
+Voici les librairies à charger pour notre projet.
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(knitr)
+library(httr)
+library(jsonlite)
+library(rgdal)
+library(sp)
+library(dplyr)
+library(htmlwidgets)
+library(htmltools)
+require(devtools)  
+devtools::install_github(repo = 'rCarto/photon')
+```
+
+## Récupération des données et création des tableaux
+
+Ce code permet d'extraire les données depuis un site internet donné et de les convertir vers un format exploitable pour créer des tableaux.
+
+```{r Api et tableaux, message=FALSE, warning=FALSE}
+MensuelGeoJson<-"https://services1.arcgis.com/HzzPcgRsxxyIZdlU/arcgis/rest/services/mes_centre_val_de_loire_mensuel_poll_princ_1/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json"
+MensuelGET<-httr::GET(MensuelGeoJson) 
+Mensuelcontent <- httr::content(MensuelGET)
+MensuelFROM <- jsonlite::fromJSON(Mensuelcontent, flatten = TRUE)
+Mensuelfeatures<-as.data.frame(MensuelFROM$features)
+Tablestats<-Mensuelfeatures %>%
+  dplyr::group_by(attributes.nom_com,attributes.nom_polluant,geometry.x,geometry.y) %>%
+  dplyr::summarise(moyenne=mean(attributes.valeur))
+```
+
+## Création des fonctions à partir des tableaux
+Ces différentes fonctions permettront de créer les différentes cartes.
+
+```{r Coordonnées, message=FALSE, warning=FALSE}
+
+Longi<-Mensuelfeatures$geometry.x
+Latti<-Mensuelfeatures$geometry.y
+longitudeCentre<-1.732406
+lattitudeCentre<-47.54903
+NO2<-dplyr::filter(Tablestats, attributes.nom_polluant=="NO2")
+LongiNO2<-NO2$geometry.x
+LattiNO2<-NO2$geometry.y
+NO<-dplyr::filter(Tablestats, attributes.nom_polluant=="NO")
+LongiNO<-NO$geometry.x
+LattiNO<-NO$geometry.y
+O3<-dplyr::filter(Tablestats, attributes.nom_polluant=="O3")
+LongiO3<-O3$geometry.x
+LattiO3<-O3$geometry.y
+PM10<-dplyr::filter(Tablestats, attributes.nom_polluant=="PM10")
+LongiPM10<-PM10$geometry.x
+LattiPM10<-PM10$geometry.y
+PM2.5<-dplyr::filter(Tablestats, attributes.nom_polluant=="PM2.5")
+LongiPM2.5<-PM2.5$geometry.x
+LattiPM2.5<-PM2.5$geometry.y
+```
+
+A partir de ces fonctions, la création de plusieurs cartes selon différentes configurations sera facilitée.
+
+## Répartition par polluants
+
+Les présents graphiques ont été réalisés à partir de la Dataviz. Les cercles ne représentent pas une étendue, mais une intensité de pollution relevée autour des différentes stations de prélèvement situées en région Centre. 
+
+### Concentration en Monoxyde d'azote
+
+```{r carteNO, message=FALSE, warning=FALSE}
+carteNO <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 13)
+carteCentre<-rgdal::readOGR(dsn = "region-centre-val-de-loire.geojson")
+
+carteNO <- carteNO %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 7.3) %>%
+  leaflet::addPolygons(data=carteCentre, fill = FALSE)
+carteNO <- carteNO %>%
+  leaflet::addMarkers(lng=Longi,lat=Latti) %>%
+  leaflet::addCircles(lng=Longi,lat=Latti, color = "blue", radius = 20)
+carteNO <- carteNO %>%
+  leaflet::addCircles(lng=LongiNO,lat=LattiNO, color = "cyan", popup = "Monoxyde d'azote (NO)", radius = (NO$moyenne*1000), fill = FALSE)
+```
+
+```{r Sauvegarde de la carte NO, message=FALSE, warning=FALSE}
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carteNO, file="ma_carte_NO.html", selfcontained = TRUE)
+
+```
+
+```{r Affichage de la carte NO, message=FALSE, warning=FALSE}
+## Affichage  de la carte
+htmltools::tags$iframe(title="Monoxyde d'azote", width = "900", height = "600", src = "ma_carte_NO.html")
+
+```
+
+### Concentration en Ozone
+
+```{r Carte O3, message=FALSE, warning=FALSE}
+carteO3 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 13)
+carteCentre<-rgdal::readOGR(dsn = "region-centre-val-de-loire.geojson")
+
+carteO3 <- carteO3 %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 7.3) %>%
+  leaflet::addPolygons(data=carteCentre, fill = FALSE)
+carteO3 <- carteO3 %>%
+  leaflet::addMarkers(lng=Longi,lat=Latti) %>%
+  leaflet::addCircles(lng=Longi,lat=Latti, color = "blue", radius = 20)
+carteO3 <- carteO3 %>%
+  leaflet::addCircles(lng=LongiO3,lat=LattiO3, color = "crimson", popup = "Ozone (O3)", radius = (O3$moyenne*1000), fill = FALSE)
+```
+```{r Sauvegarde de la carte O3, message=FALSE, warning=FALSE}
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carteO3, file="ma_carte_O3.html", selfcontained = TRUE)
+
+```
+
+```{r Affichage de la carte O3, message=FALSE, warning=FALSE}
+## Affichage  de la carte
+htmltools::tags$iframe(title="Ozone", width = "900", height = "600", src = "ma_carte_O3.html")
+
+```
+
+### Concentration en Dioxyde d'azote
+
+```{r Carte NO2, message=FALSE, warning=FALSE}
+carteNO2 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 13)
+carteCentre<-rgdal::readOGR(dsn = "region-centre-val-de-loire.geojson")
+
+carteNO2 <- carteNO2 %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 7.3) %>%
+  leaflet::addPolygons(data=carteCentre, fill = FALSE)
+carteNO2 <- carteNO2 %>%
+  leaflet::addMarkers(lng=Longi,lat=Latti) %>%
+  leaflet::addCircles(lng=Longi,lat=Latti, color = "blue", radius = 20)
+carteNO2 <- carteNO2 %>%
+  leaflet::addCircles(lng=LongiNO2,lat=LattiNO2, color = "purple", popup = "Dioxyde d'azote (NO2)", radius = (NO2$moyenne*1000), fill = FALSE)
+```
+```{r Sauvegarde de la carte NO2, message=FALSE, warning=FALSE}
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carteNO2, file="ma_carte_NO2.html", selfcontained = TRUE)
+```
+
+```{r Affichage de la carte NO2, message=FALSE, warning=FALSE}
+## Affichage  de la carte
+htmltools::tags$iframe(title="Ozone", width = "900", height = "600", src = "ma_carte_NO2.html")
+```
+
+
+### Concentration en particules fines de moins de 2,5 microns
+
+```{r Carte PM2.5, message=FALSE, warning=FALSE}
+cartePM2.5 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 13)
+carteCentre<-rgdal::readOGR(dsn = "region-centre-val-de-loire.geojson")
+
+cartePM2.5 <- cartePM2.5 %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 7.3) %>%
+  leaflet::addPolygons(data=carteCentre, fill = FALSE)
+cartePM2.5 <- cartePM2.5 %>%
+  leaflet::addMarkers(lng=Longi,lat=Latti) %>%
+  leaflet::addCircles(lng=Longi,lat=Latti, color = "blue", radius = 20)
+cartePM2.5 <- cartePM2.5 %>%
+  leaflet::addCircles(lng=LongiPM2.5,lat=LattiPM2.5, color = "green", popup = "Particules fines de moins de 2,5 microns (PM2.5)", radius = (PM10$moyenne*1000), fill = FALSE)
+```
+```{r Sauvegarde de la carte PM2.5, message=FALSE, warning=FALSE}
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=cartePM2.5, file="ma_carte_PM2.5.html", selfcontained = TRUE)
+```
+
+```{r Affichage de la carte PM2.5, message=FALSE, warning=FALSE}
+## Affichage  de la carte
+htmltools::tags$iframe(title="Particules fines (-2,5)", width = "900", height = "600", src = "ma_carte_PM2.5.html")
+```
+
+### Concentration en particules fines de moins de 10 microns
+```{r Carte PM10, message=FALSE, warning=FALSE}
+cartePM10 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 13)
+carteCentre<-rgdal::readOGR(dsn = "region-centre-val-de-loire.geojson")
+
+cartePM10 <- cartePM10 %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = longitudeCentre, lat = lattitudeCentre, zoom = 7.3) %>%
+  leaflet::addPolygons(data=carteCentre, fill = FALSE)
+cartePM10 <- cartePM10 %>%
+  leaflet::addMarkers(lng=Longi,lat=Latti) %>%
+  leaflet::addCircles(lng=Longi,lat=Latti, color = "blue", radius = 20)
+cartePM10 <- cartePM10 %>%
+  leaflet::addCircles(lng=LongiPM10,lat=LattiPM10, color = "yellow", popup = "Particules fines de moins de 10 microns (PM10)", radius = (PM10$moyenne*1000), fill = FALSE)
+```
+```{r Sauvegarde de la carte PM10, message=FALSE, warning=FALSE}
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=cartePM10, file="ma_carte_PM10.html", selfcontained = TRUE)
+```
+
+```{r Affichage de la carte PM10, message=FALSE, warning=FALSE}
+## Affichage  de la carte
+htmltools::tags$iframe(title="Particules fines (-10)", width = "900", height = "600", src = "ma_carte_PM10.html")
+```
+
